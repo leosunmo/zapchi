@@ -11,19 +11,19 @@ import (
 )
 
 var (
-	// SugaredLogFormat is the format the Chi logs will use when
+	// sugaredLogFormat is the format the Chi logs will use when
 	// a sugared Zap logger is passed. Uses fmt.Printf templating.
-	SugaredLogFormat = `%s Request: {Method: %s, Path: %s, ReqID: %s, RemoteIP: %s, Protocol: %s} Response: {Status: %d, Elapsed: %s, Size: %d bytes}`
+	sugaredLogFormat = `[%s] "%s %s %s" from %s - %s %dB in %s`
 )
 
-// Logger is a Chi middleware that logs each request received using
+// Logger is a Chi middleware that logs each request recived using
 // the provided Zap logger, sugared or not.
 // Provide a name if you want to set the caller (`.Named()`)
 // otherwise leave blank.
 func Logger(l interface{}, name string) func(next http.Handler) http.Handler {
 	switch logger := l.(type) {
 	case *zap.Logger:
-		logger = logger.Named(name)
+		logger = zap.New(logger.Core(), zap.AddCallerSkip(1)).Named(name)
 		logger.Debug("zap.logger detected for chi")
 		return func(next http.Handler) http.Handler {
 			fn := func(w http.ResponseWriter, r *http.Request) {
@@ -46,26 +46,22 @@ func Logger(l interface{}, name string) func(next http.Handler) http.Handler {
 		}
 
 	case *zap.SugaredLogger:
-		logger = logger.Named(name)
+		logger = zap.New(logger.Desugar().Core(), zap.AddCallerSkip(1)).Sugar().Named(name)
 		logger.Debug("zap.SugaredLogger logger detected for chi")
 		return func(next http.Handler) http.Handler {
 			fn := func(w http.ResponseWriter, r *http.Request) {
 				ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 				t1 := time.Now()
 				defer func() {
-					logger.Infof(SugaredLogFormat,
-						// Header
-						statusLabel(ww.Status()), // "200 OK"
-						// Request
+					logger.Infof(sugaredLogFormat,
+						middleware.GetReqID(r.Context()), // RequestID (if set)
 						r.Method,                         // Method
 						r.URL.Path,                       // Path
-						middleware.GetReqID(r.Context()), // RequestID (if set)
-						r.RemoteAddr,                     // RemoteAddr
 						r.Proto,                          // Protocol
-						// Response
-						ww.Status(),       // Status
-						time.Since(t1),    // Elapsed
-						ww.BytesWritten(), // Bytes Written
+						r.RemoteAddr,                     // RemoteAddr
+						statusLabel(ww.Status()),         // "200 OK"
+						ww.BytesWritten(),                // Bytes Written
+						time.Since(t1),                   // Elapsed
 					)
 				}()
 				next.ServeHTTP(ww, r)
