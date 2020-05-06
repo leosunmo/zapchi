@@ -26,8 +26,8 @@ import (
 )
 
 func main() {
-	// Logger with caller disabled as it will only display zapchi.go
-	logger, _ := zap.NewProduction(zap.WithCaller(false))
+	// Logger with default production config
+	logger, _ := zap.NewProduction()
 	defer logger.Sync() // Flush buffer
 
 	// Service
@@ -39,11 +39,11 @@ func main() {
 	// Request ID should be before logger
 	r.Use(middleware.RequestID)
 
-	// Normal Zap logger
-	r.Use(zapchi.Logger(logger, ""))
+	// Zap logger with logger name router
+	r.Use(zapchi.Logger(logger, "router"))
 
-	// Or Sugared logger
-	// r.Use(zapchi.Logger(logger.Sugar()))
+	// Sugared logger with no logger name
+	// r.Use(zapchi.Logger(logger.Sugar(),""))
 
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("hello world"))
