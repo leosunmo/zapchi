@@ -76,16 +76,8 @@ func Logger(l interface{}, name string) func(next http.Handler) http.Handler {
 }
 
 func statusLabel(status int) string {
-	switch {
-	case status >= 100 && status < 300:
-		return fmt.Sprintf("%d OK", status)
-	case status >= 300 && status < 400:
-		return fmt.Sprintf("%d Redirect", status)
-	case status >= 400 && status < 500:
-		return fmt.Sprintf("%d Client Error", status)
-	case status >= 500:
-		return fmt.Sprintf("%d Server Error", status)
-	default:
-		return fmt.Sprintf("%d Unknown", status)
+	if statusText := http.StatusText(status); statusText != "" {
+		return fmt.Sprintf("%d %s", status, statusText)
 	}
+	return fmt.Sprintf("%d Unknown", status)
 }
